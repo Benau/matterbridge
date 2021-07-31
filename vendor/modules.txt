@@ -428,6 +428,10 @@ google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
+# gopkg.in/gographics/imagick.v2 v2.6.0
+## explicit
+gopkg.in/gographics/imagick.v2/imagick
+gopkg.in/gographics/imagick.v2/imagick/types
 # gopkg.in/ini.v1 v1.62.0
 gopkg.in/ini.v1
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
