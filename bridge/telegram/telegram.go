@@ -2,7 +2,6 @@ package btelegram
 
 import (
 	"html"
-	"log"
 	"strconv"
 	"strings"
 
@@ -19,6 +18,7 @@ const (
 	MarkdownV2  = "MarkdownV2"
 	FormatPng   = "png"
 	FormatWebp  = "webp"
+	FormatGif   = "gif"
 )
 
 type Btelegram struct {
@@ -28,16 +28,6 @@ type Btelegram struct {
 }
 
 func New(cfg *bridge.Config) bridge.Bridger {
-	tgsConvertFormat := cfg.GetString("MediaConvertTgs")
-	if tgsConvertFormat != "" {
-		err := helper.CanConvertTgsToX()
-		if err != nil {
-			log.Fatalf("Telegram bridge configured to convert .tgs files to '%s', but lottie does not appear to work:\n%#v", tgsConvertFormat, err)
-		}
-		if tgsConvertFormat != FormatPng && tgsConvertFormat != FormatWebp {
-			log.Fatalf("Telegram bridge configured to convert .tgs files to '%s', but only '%s' and '%s' are supported.", FormatPng, FormatWebp, tgsConvertFormat)
-		}
-	}
 	return &Btelegram{Config: cfg, avatarMap: make(map[string]string)}
 }
 

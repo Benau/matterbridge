@@ -226,13 +226,11 @@ func (b *Btelegram) maybeConvertTgs(name *string, data *[]byte) {
 		b.Log.Debugf("Tgs to WebP conversion enabled, converting %v", name)
 		format = FormatWebp
 	case FormatPng:
-		// The WebP to PNG converter can't handle animated webp files yet,
-		// and I'm not going to write a path for x/image/webp.
-		// The error message would be:
-		//     conversion failed: webp: non-Alpha VP8X is not implemented
-		// So instead, we tell lottie to directly go to PNG.
 		b.Log.Debugf("Tgs to PNG conversion enabled, converting %v", name)
 		format = FormatPng
+	case FormatGif:
+		b.Log.Debugf("Tgs to Gif conversion enabled, converting %v", name)
+		format = FormatGif
 	default:
 		// Otherwise, no conversion was requested. Trying to run the usual webp
 		// converter would fail, because '.tgs.webp' is actually a gzipped JSON

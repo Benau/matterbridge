@@ -2,25 +2,27 @@ package helper
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"image/png"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"golang.org/x/image/webp"
+	"gopkg.in/gographics/imagick.v2/imagick"
 
 	"github.com/42wim/matterbridge/bridge/config"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 	"github.com/sirupsen/logrus"
+
+	rlottie "github.com/42wim/matterbridge/rlottie"
 )
 
 // DownloadFile downloads the given non-authenticated URL.
@@ -240,65 +242,80 @@ func ConvertWebPToPNG(data *[]byte) error {
 	return nil
 }
 
-// CanConvertTgsToX Checks whether the external command necessary for ConvertTgsToX works.
-func CanConvertTgsToX() error {
-	// We depend on the fact that `lottie_convert.py --help` has exit status 0.
-	// Hyrum's Law predicted this, and Murphy's Law predicts that this will break eventually.
-	// However, there is no alternative like `lottie_convert.py --is-properly-installed`
-	cmd := exec.Command("lottie_convert.py", "--help")
-	return cmd.Run()
-}
-
-// ConvertTgsToWebP convert input data (which should be tgs format) to WebP format
-// This relies on an external command, which is ugly, but works.
+// ConvertTgsToX convert input data (which should be tgs format) to any format
 func ConvertTgsToX(data *[]byte, outputFormat string, logger *logrus.Entry) error {
-	// lottie can't handle input from a pipe, so write to a temporary file:
-	tmpInFile, err := ioutil.TempFile(os.TempDir(), "matterbridge-lottie-input-*.tgs")
+	z, err := gzip.NewReader(bytes.NewReader(*data))
 	if err != nil {
-		return err
+		logger.Errorf("Failed to run gzip.NewReader %s", err)
+		return nil
 	}
-	tmpInFileName := tmpInFile.Name()
-	defer func() {
-		if removeErr := os.Remove(tmpInFileName); removeErr != nil {
-			logger.Errorf("Could not delete temporary (input) file %s: %v", tmpInFileName, removeErr)
+	uncompressed, err := ioutil.ReadAll(z)
+	if err != nil {
+		logger.Errorf("Failed to run.ReadAll %s", err)
+		z.Close()
+		return nil
+	}
+	z.Close()
+
+	animation := rlottie.LottieAnimationFromData(string(uncompressed[:]))
+	if animation.Ptr == nil {
+		logger.Errorf("Failed to import tgs")
+		return nil
+	}
+	w, h := rlottie.LottieAnimationGetSize(animation)
+
+	buf := make([]byte, w * h * 4)
+	frame_rate := rlottie.LottieAnimationGetFramerate(animation)
+	duration := rlottie.LottieAnimationGetDuration(animation)
+	var desired_framerate float64
+	desired_framerate = frame_rate
+	// Gif player doesn't support 60fps from tgs
+	if desired_framerate > 50. {
+		desired_framerate = 50.
+	}
+	step := duration / desired_framerate
+
+	imagick.Initialize()
+	defer imagick.Terminate()
+
+	var mw *imagick.MagickWand
+	mw = imagick.NewMagickWand()
+	var i float64
+	for i = 0.; i < duration; i += step {
+		frame := rlottie.LottieAnimationGetFrameAtPos(animation, float32(i))
+		rlottie.LottieAnimationRender(animation, frame, buf, w, h, w * 4)
+		mw.ConstituteImage(w, h, "BGRA", imagick.PIXEL_CHAR, buf)
+		if outputFormat == "png" {
+			break;
 		}
-	}()
-	// lottie can handle writing to a pipe, but there is no way to do that platform-independently.
-	// "/dev/stdout" won't work on Windows, and "-" upsets Cairo for some reason. So we need another file:
-	tmpOutFile, err := ioutil.TempFile(os.TempDir(), "matterbridge-lottie-output-*.data")
-	if err != nil {
-		return err
+		mw.SetImageDispose(imagick.DISPOSE_BACKGROUND)
+		mw.SetImageDelay((uint)(1000. / desired_framerate / 10.))
 	}
-	tmpOutFileName := tmpOutFile.Name()
-	defer func() {
-		if removeErr := os.Remove(tmpOutFileName); removeErr != nil {
-			logger.Errorf("Could not delete temporary (output) file %s: %v", tmpOutFileName, removeErr)
-		}
-	}()
+	rlottie.LottieAnimationDestroy(animation)
 
-	if _, writeErr := tmpInFile.Write(*data); writeErr != nil {
-		return writeErr
-	}
-	// Must close before calling lottie to avoid data races:
-	if closeErr := tmpInFile.Close(); closeErr != nil {
-		return closeErr
-	}
+	var optimized *imagick.MagickWand
+	optimized = mw.OptimizeImageLayers();
+	mw.Destroy()
+	mw = optimized
+	defer mw.Destroy()
+	mw.OptimizeImageTransparency();
 
-	// Call lottie to transform:
-	cmd := exec.Command("lottie_convert.py", "--input-format", "lottie", "--output-format", outputFormat, tmpInFileName, tmpOutFileName)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	// NB: lottie writes progress into to stderr in all cases.
-	_, stderr := cmd.Output()
-	if stderr != nil {
-		// 'stderr' already contains some parts of Stderr, because it was set to 'nil'.
-		return stderr
+	ret := mw.SetImageFormat(outputFormat)
+	if ret != nil {
+		logger.Errorf("Failed to SetImageFormat: %s", err)
+		return nil
 	}
-	dataContents, err := ioutil.ReadFile(tmpOutFileName)
-	if err != nil {
-		return err
+	var blob []byte
+	if outputFormat == "png" {
+		blob =  mw.GetImageBlob()
+	} else {
+		blob = mw.GetImagesBlob()
+	}
+	if blob == nil {
+		logger.Errorf("Failed to mw.GetImage(s)Blob()")
+		return nil
 	}
 
-	*data = dataContents
+	*data = blob
 	return nil
 }
