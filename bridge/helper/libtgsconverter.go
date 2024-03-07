@@ -17,6 +17,7 @@ func CanConvertTgsToX() error {
 func ConvertTgsToX(data *[]byte, outputFormat string, logger *logrus.Entry) error {
 	options := libtgsconverter.NewConverterOptions()
 	options.SetExtension(outputFormat)
+	options.SetScale(0.5)
 	blob, err := libtgsconverter.ImportFromData(*data, options)
 	if err != nil {
 		return fmt.Errorf("failed to run libtgsconverter.ImportFromData: %s", err.Error())

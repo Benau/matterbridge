@@ -216,6 +216,11 @@ func (b *Btelegram) handleRecv(updates <-chan tgbotapi.Update) {
 			continue
 		}
 
+		if message.Sticker != nil && update.EditedMessage != nil {
+			b.Log.Debug("Ignore sticker with edited message, which is likely to be reactions for them. Telegram bot at the moment doesn't support reactions, see https://github.com/go-telegram-bot-api/telegram-bot-api/issues/506.")
+			continue
+		}
+
 		// set the ID's from the channel or group message
 		rmsg.ID = strconv.Itoa(message.MessageID)
 		rmsg.Channel = strconv.FormatInt(message.Chat.ID, 10)
@@ -243,7 +248,7 @@ func (b *Btelegram) handleRecv(updates <-chan tgbotapi.Update) {
 		}
 
 		// handle forwarded messages
-		b.handleForwarded(&rmsg, message)
+		//b.handleForwarded(&rmsg, message)
 
 		// quote the previous message
 		b.handleQuoting(&rmsg, message)

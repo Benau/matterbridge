@@ -8,6 +8,7 @@ package helper
 // int writer_cgo(size_t buffer_length, const uint8_t *buffer, void *user_data);
 import "C"
 import "unsafe"
+//import "io/ioutil"
 
 var output []byte
 
@@ -26,5 +27,6 @@ func ConvertAnimation(name *string, data *[]byte) {
 	if C.animationToGif(ptr, C.int(len(*data)), (C.writeCallback)(unsafe.Pointer(C.writer_cgo))) == 0 {
 		*data = output
 		*name = *name + ".gif"
+		//ioutil.WriteFile(*name, *data, 0644)
 	}
 }
