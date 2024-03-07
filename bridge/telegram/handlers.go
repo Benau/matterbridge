@@ -429,6 +429,10 @@ func (b *Btelegram) handleDownload(rmsg *config.Message, message *tgbotapi.Messa
 		return err
 	}
 
+	if message.Animation != nil && b.GetBool("MediaConvertAnimation") {
+		helper.ConvertAnimation(&name, data)
+	}
+
 	if strings.HasSuffix(name, ".tgs.webp") {
 		b.maybeConvertTgs(&name, data)
 	} else if strings.HasSuffix(name, ".webp") {

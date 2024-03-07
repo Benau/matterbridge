@@ -115,6 +115,7 @@ type Protocol struct {
 	MediaServerDownload    string
 	MediaServerUpload      string
 	MediaConvertTgs        string     // telegram
+	MediaConvertAnimation  bool
 	MediaConvertWebPToPNG  bool       // telegram
 	MessageDelay           int        // IRC, time in millisecond to wait between messages
 	MessageFormat          string     // telegram
